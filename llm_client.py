@@ -1,15 +1,14 @@
 import os
 from openai import OpenAI
 from dotenv import load_dotenv
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 # 加载 .env 文件中的环境变量
 load_dotenv()
 
-class HelloAgentsLLM:
+class AgentsLLM:
     """
-    为本书 "Hello Agents" 定制的LLM客户端。
-    它用于调用任何兼容OpenAI接口的服务，并默认使用流式响应。
+    兼容 OpenAI 接口的 LLM 客户端，返回完整响应。
     """
     def __init__(self, model: str = None, apiKey: str = None, baseUrl: str = None, timeout: int = None):
         """
@@ -25,50 +24,25 @@ class HelloAgentsLLM:
 
         self.client = OpenAI(api_key=apiKey, base_url=baseUrl, timeout=timeout)
 
-    def think(self, messages: List[Dict[str, str]], temperature: float = 0) -> str:
+    def think(self, messages: List[Dict[str, str]], temperature: float = 0) -> Optional[str]:
         """
-        调用大语言模型进行思考，并返回其响应。
+        等待模型完整响应后返回文本，由调用方统一展示。
         """
-        print(f"🧠 正在调用 {self.model} 模型...")
+        print(f"🧠 正在调用 {self.model} 模型，请稍候...", flush=True)
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 temperature=temperature,
-                stream=True,
+                stream=False,
             )
 
-            # 处理流式响应
-            print("✅ 大语言模型响应成功:")
-            collected_content = []
-            for chunk in response:
-                if not chunk.choices:
-                    continue
-                content = chunk.choices[0].delta.content or ""
-                print(content, end="", flush=True)
-                collected_content.append(content)
-            print()  # 在流式输出结束后换行
-            return "".join(collected_content)
+            if not response.choices:
+                return None
+            content = response.choices[0].message.content
+            return content.strip() if content else None
 
         except Exception as e:
             print(f"❌ 调用LLM API时发生错误: {e}")
             return None
 
-# --- 客户端使用示例 ---
-if __name__ == '__main__':
-    try:
-        llmClient = HelloAgentsLLM()
-
-        exampleMessages = [
-            {"role": "system", "content": "You are a helpful assistant that writes Python code."},
-            {"role": "user", "content": "写一个快速排序算法"}
-        ]
-
-        print("--- 调用LLM ---")
-        responseText = llmClient.think(exampleMessages)
-        if responseText:
-            print("\n\n--- 完整模型响应 ---")
-            print(responseText)
-
-    except ValueError as e:
-        print(e)
